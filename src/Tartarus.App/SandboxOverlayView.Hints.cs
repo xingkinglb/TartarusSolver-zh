@@ -46,7 +46,7 @@ public sealed partial class SandboxOverlayView
         foreach (var (chest, name, expected) in new[] { ("chromatic", "Chromatic", best.Value.Chromatic), ("ultimate", "Ultimate", best.Value.Ultimate) })
         {
             var icon = Icon(ChestDir, chest);
-            parts.Add((icon, (icon == null ? name + " " : "") + "×" + expected.ToString("0.0", CultureInfo.InvariantCulture), HintBrush));
+            parts.Add((icon, (icon == null ? Loc.T(name) + " " : "") + "×" + expected.ToString("0.0", CultureInfo.InvariantCulture), HintBrush));
         }
         // A size up from the overlay's other captions: the hint is what the player reads at a glance.
         ColorPill(dc, parts, new Point(box.Left + box.Width / 2, box.Top - 2), fontSize * 1.17, ppd);
@@ -157,15 +157,20 @@ public sealed partial class SandboxOverlayView
         // On the Consume target pick the best move but consuming is made by Cancel first: ranked with the targets.
         var shown = hint.Ranked;
         if (shown.Count == 0) return;
-        string Name(ActionValue a) => RankedName(hint, a);
+        // The screen reads in the interface's language; the log and bug reports keep the English (RankedName).
+        string Name(ActionValue a) => RankedNameLoc(hint, a);
         var best = shown[0];
         var ties = shown.Skip(1).Where(a => best.Mean - a.Mean < Hint.TieWithin).ToList();
         var next = shown.Skip(1 + ties.Count).FirstOrDefault();
-        string text = $"Hint: {Name(best)}"
-            + string.Concat(ties.Select(t => $" ≈ {Name(t)}")) + (ties.Count > 0 ? " (tied)" : "")
-            + $" — at the Riot ≈{best.Chromatic:0.0} Chromatic · {best.Ultimate:0.0} Ultimate · {best.Legendary:0.0} Legendary"
-            + (next != null ? $" · then {Name(next)}" : "")
-            + $"  ({hint.Result.Playouts.ToString("N0", CultureInfo.InvariantCulture)} playouts{(hint.Final ? "" : ", computing…")})";
+        string text = Loc.F("Hint: {0}", Name(best))
+            + string.Concat(ties.Select(t => Loc.F(" ≈ {0}", Name(t)))) + (ties.Count > 0 ? Loc.T(" (tied)") : "")
+            + Loc.F(" — at the Riot ≈{0} Chromatic · {1} Ultimate · {2} Legendary",
+                best.Chromatic.ToString("0.0", CultureInfo.InvariantCulture),
+                best.Ultimate.ToString("0.0", CultureInfo.InvariantCulture),
+                best.Legendary.ToString("0.0", CultureInfo.InvariantCulture))
+            + (next != null ? Loc.F(" · then {0}", Name(next)) : "")
+            + Loc.F("  ({0} playouts{1})", hint.Result.Playouts.ToString("N0", CultureInfo.InvariantCulture),
+                hint.Final ? "" : Loc.T(", computing…"));
         Pill(dc, text, new Point(8, 34), HintBrush, 13, ppd);
     }
 
@@ -173,6 +178,26 @@ public sealed partial class SandboxOverlayView
     /// <summary>A move of <see cref="Hint.Ranked"/> by name: on the Consume target pick the rest but consuming go by Cancel.</summary>
     public static string RankedName(Hint hint, ActionValue a) => !hint.ConsumeOnly || a.Action.Kind is ActionKind.Consume or ActionKind.Chain ? ActionName(a.Action)
         : a.Action.Kind == ActionKind.StopChain ? "Cancel" : $"Cancel → {ActionName(a.Action)}";
+
+    /// <summary>The same names for the screen, in the interface's language (<see cref="ActionName"/> stays English for the log).</summary>
+    public static string ActionNameLoc(GameAction a) => a.Kind switch
+    {
+        ActionKind.Move => a.Arg == GameData.Room ? Loc.T("Interrogation Room") : Loc.F("Cell {0}", a.Arg + 1),
+        ActionKind.Consume or ActionKind.Chain => Loc.F("Consume: Cell {0}", a.Arg + 1),
+        ActionKind.StopChain => Loc.T("Cancel"),
+        ActionKind.Replace => Loc.T("Replace"),
+        ActionKind.End => Loc.T("End"),
+        ActionKind.Hunt => Loc.F("Hunt: Cell {0}", a.Arg + 1),
+        ActionKind.Interrogate => a.Arg == 0 ? Loc.T("Instigate") : Loc.T("Bestow"),
+        ActionKind.PickInstrument => Loc.T(GameData.Info((Instrument)a.Arg).Name),
+        ActionKind.Reroll => Loc.T("Re-roll"),
+        ActionKind.PickTreasure => Loc.T(GameData.Name((Treasure)a.Arg)),
+        ActionKind.Ratway => Loc.F("Sewer Ratway: Cell {0}", a.Arg + 1),
+        _ => a.ToString(),
+    };
+
+    public static string RankedNameLoc(Hint hint, ActionValue a) => !hint.ConsumeOnly || a.Action.Kind is ActionKind.Consume or ActionKind.Chain ? ActionNameLoc(a.Action)
+        : a.Action.Kind == ActionKind.StopChain ? Loc.T("Cancel") : Loc.F("Cancel → {0}", ActionNameLoc(a.Action));
 
     public static string ActionName(GameAction a) => a.Kind switch
     {

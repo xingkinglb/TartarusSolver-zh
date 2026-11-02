@@ -72,8 +72,10 @@ public partial class ControlWindow : Window
                     + $" ({hint.Result.Elapsed.TotalMilliseconds:0} ms)");
             _hint = hint;
             _hintShownAt = DateTime.Now;
-            HintStatus.Text = $"Last hint: {hint.Result.Elapsed.TotalMilliseconds:0} ms, {hint.Result.Playouts:N0} playouts"
-                + (_hints.Net != null ? " · value net" : " · no value net") + (_hints.Policy != null ? " · policy net" : "") + (_hints.Picks != null ? " · picks net" : "");
+            HintStatus.Text = Loc.F("Last hint: {0} ms, {1} playouts",
+                    hint.Result.Elapsed.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture),
+                    hint.Result.Playouts.ToString("N0", CultureInfo.InvariantCulture))
+                + (_hints.Net != null ? Loc.T(" · value net") : Loc.T(" · no value net")) + (_hints.Policy != null ? Loc.T(" · policy net") : "") + (_hints.Picks != null ? Loc.T(" · picks net") : "");
             RefreshOverlay();
         });
         _dataset = new Dataset(settings.DatasetDir);
@@ -89,18 +91,18 @@ public partial class ControlWindow : Window
         else WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         string Hk(string action) => settings.Hotkeys.TryGetValue(action, out var g) && !string.IsNullOrWhiteSpace(g) ? $" ({g})" : "";
-        ScanButton.Content = "Scan" + Hk("scan");
-        OverlayCheck.Content = "Overlay" + Hk("overlay");
-        EditCheck.Content = "Edit mode" + Hk("edit");
-        SaveButton.Content = "Save frame" + Hk("save");
-        AutoScanCheck.Content = "Auto" + Hk("auto") + ", every";
-        ReportButton.Content = "Report a bug" + Hk("report");
-        Title = $"Tartarus Solver {AppVersion.Number}" + (settings.Debug ? " (debug)" : "");
+        ScanButton.Content = Loc.T("Scan") + Hk("scan");
+        OverlayCheck.Content = Loc.T("Overlay") + Hk("overlay");
+        EditCheck.Content = Loc.T("Edit mode") + Hk("edit");
+        SaveButton.Content = Loc.T("Save frame") + Hk("save");
+        AutoScanCheck.Content = Loc.T("Auto") + Hk("auto") + Loc.T(", every");
+        ReportButton.Content = Loc.T("Report a bug") + Hk("report");
+        Title = $"Tartarus Solver {AppVersion.Number}" + (settings.Debug ? Loc.T(" (debug)") : "");
         // The player's window: the game window, scanning, the hints' quality, the game's log, the version
         // and bug reports.
         if (!settings.Debug)
             foreach (var panel in new FrameworkElement[] { ViewPanel, HintsCheck, HintsOnlyCheck, DebugPanel }) panel.Visibility = Visibility.Collapsed;
-        VersionText.Text = "Version " + AppVersion.Short;
+        VersionText.Text = Loc.T("Version") + " " + AppVersion.Short;
         VersionText.ToolTip = AppVersion.Full;
         Log("Version " + AppVersion.Short + (BugReports.Enabled ? "" : " · bug reports not set up"));
 
@@ -122,6 +124,16 @@ public partial class ControlWindow : Window
         GameLanguageAutoCheck.Checked += GameLanguageAuto_Changed;
         GameLanguageAutoCheck.Unchecked += GameLanguageAuto_Changed;
         GameLanguageCombo.SelectionChanged += GameLanguageCombo_SelectionChanged;
+        // The interface's own language: the XAML's words are swapped when a window is built, so a change takes the next start.
+        foreach (var (code, label) in new[] { ("auto", Loc.T("Automatic")), ("en", "English"), ("zhCN", "中文") })
+            UiLanguageCombo.Items.Add(new ComboBoxItem { Content = label, Tag = code });
+        UiLanguageCombo.SelectedIndex = settings.UiLanguage.ToLowerInvariant() switch
+        {
+            "en" or "english" => 1,
+            var code when code.StartsWith("zh", StringComparison.Ordinal) => 2,
+            _ => 0,
+        };
+        UiLanguageCombo.SelectionChanged += UiLanguageCombo_SelectionChanged;
         _placeTimer.Tick += (_, _) => PlaceOverlay();
         _attachTimer.Tick += (_, _) => TryAutoAttach();
 
@@ -132,6 +144,9 @@ public partial class ControlWindow : Window
         UpdateDatasetStatus();
         SetupUpdates();
         ShowStats();
+        // Last: every line the XAML wrote, in the interface's language where the table has a word for it.
+        if (Loc.Chinese) FontFamily = Loc.Font;
+        LocTree.Apply(this);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -312,8 +327,8 @@ public partial class ControlWindow : Window
         if (_warnedModelsGone) return;
         _warnedModelsGone = true;
         Log($"OCR models not found in {AppContext.BaseDirectory}");
-        Dispatcher.BeginInvoke(() => MessageBox.Show(this, "The program's files are missing from its folder (models/ocr), so the game's text may not be read.\n\n"
-            + "Unpack the whole archive into a folder of its own and run the program from there, not from inside the archive.",
+        Dispatcher.BeginInvoke(() => MessageBox.Show(this, Loc.T(
+                "The program's files are missing from its folder (models/ocr), so the game's text may not be read.\n\nUnpack the whole archive into a folder of its own and run the program from there, not from inside the archive."),
             "Tartarus Solver", MessageBoxButton.OK, MessageBoxImage.Warning), DispatcherPriority.ApplicationIdle);
     }
 
@@ -339,6 +354,16 @@ public partial class ControlWindow : Window
         CheckGameLanguage();
     }
 
+    /// <summary>The interface's language chosen: kept for the next start, where every window is built in it.</summary>
+    private void UiLanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (UiLanguageCombo.SelectedItem is not ComboBoxItem { Tag: string code } || code == _settings.UiLanguage) return;
+        _settings.UiLanguage = code;
+        _settings.Save();
+        MessageBox.Show(this, Loc.T("The interface's language is kept and comes at the next start of the app."),
+            "Tartarus Solver", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void GameLanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_showingLanguage || (GameLanguageCombo.SelectedItem as ComboBoxItem)?.Tag is not string code) return;
@@ -358,7 +383,7 @@ public partial class ControlWindow : Window
     // The game's text doesn't read in the language taken, until a frame's does: the overlay says so.
     private bool _textUnread;
     // In every language of the game: which one the player reads is what isn't known.
-    private static readonly string LanguageAsk = "Tartarus Solver: Game language\n"
+    private static readonly string LanguageAsk = Loc.T("Tartarus Solver: Game language") + "\n"
         + string.Join("\n", Tartarus.Vision.Ocr.OcrPacks.GameLanguages.Select(Tartarus.Vision.Ocr.OcrPacks.ChooseLanguage));
     // Languages the player was asked about this session: not asked again until the next start.
     private readonly HashSet<string> _askedLanguage = [];
@@ -457,9 +482,9 @@ public partial class ControlWindow : Window
     // Windows.Graphics.Capture missing on this PC: auto attach stops trying (2026-11-01, Windows 10 1909: tried every
     // 2 s, 1904 lines of the same failure in the log, nothing on screen to tell the player why).
     private bool _captureUnsupported;
-    private static string UnsupportedStatus => WindowCapture.WindowsTooOld
+    private static string UnsupportedStatus => Loc.T(WindowCapture.WindowsTooOld
         ? "Not capturing: this Windows is too old, the app needs Windows 10 version 1903 or later"
-        : "Not capturing: Windows can't capture windows on this PC (Windows.Graphics.Capture unsupported)";
+        : "Not capturing: Windows can't capture windows on this PC (Windows.Graphics.Capture unsupported)");
 
     // A capture that fails is tried again later and later, the failure said when it changes and at each tenth try (2026-11-03:
     // tried every 2 s for hours, 859 lines of the same failure in a log, and a Direct3D device left behind by each).
@@ -477,7 +502,7 @@ public partial class ControlWindow : Window
         if (_capture != null || _startingCapture || _findingGame) return;
         if (AutoAttachCheck.IsChecked != true)
         {
-            CaptureStatus.Text = "Not capturing";
+            CaptureStatus.Text = Loc.T("Not capturing");
             return;
         }
         if (_captureUnsupported)
@@ -499,9 +524,9 @@ public partial class ControlWindow : Window
         {
             // A new game window starts afresh, without the old one's pause.
             _captureFails = 0;
-            CaptureStatus.Text = "Not capturing: waiting for the game window (Torchlight: Infinite)…";
+            CaptureStatus.Text = Loc.T("Not capturing: waiting for the game window (Torchlight: Infinite)…");
         }
-        else if (Win32Windows.IsMinimized(game.Hwnd)) CaptureStatus.Text = "Not capturing: the game window is minimized, restore it";
+        else if (Win32Windows.IsMinimized(game.Hwnd)) CaptureStatus.Text = Loc.T("Not capturing: the game window is minimized, restore it");
         else StartCapture(game);
     }
 
@@ -526,8 +551,8 @@ public partial class ControlWindow : Window
             _capture = capture;
             (_captureFails, _captureFailure, _captureNextTry) = (0, null, default);
             _target = w;
-            CaptureButton.Content = "Stop ■";
-            CaptureStatus.Text = $"Capturing: {w}";
+            CaptureButton.Content = Loc.T("Stop ■");
+            CaptureStatus.Text = Loc.F("Capturing: {0}", w);
             Log($"Capturing window \"{w.Title}\" ({w.Process}), {Win32Windows.VisibleBounds(w.Hwnd)}");
             // The log of the very install that's running, from its executable's path.
             if (Win32Windows.ImagePath(w.Pid) is { } exe) StartGameLog(exe);
@@ -554,9 +579,10 @@ public partial class ControlWindow : Window
             _captureFailure = ex.Message;
             double wait = Math.Min(CaptureRetryMax.TotalSeconds, Math.Pow(2, Math.Min(_captureFails, 10)));
             _captureNextTry = DateTime.Now.AddSeconds(wait);
+            // 被 Windows 拒绝时用它自带的多语言提示（作者已备好简体中文），其余情况走我们的译文表。
             CaptureStatus.Text = WindowCapture.IsRefused(ex)
                 ? $"{Tartarus.Vision.Ocr.OcrPacks.CaptureRefused(Tartarus.Vision.Ocr.OcrPacks.FromCulture(System.Globalization.CultureInfo.CurrentUICulture.Name))} (0x{ex.HResult:X8})"
-                : CaptureFailedStatus;
+                : Loc.T(CaptureFailedStatus);
         }
         finally
         {
@@ -571,8 +597,8 @@ public partial class ControlWindow : Window
         if (_capture is { } old) Task.Run(old.Dispose);
         _capture = null;
         _target = null;
-        CaptureButton.Content = "Capture ▶";
-        CaptureStatus.Text = "Not capturing";
+        CaptureButton.Content = Loc.T("Capture ▶");
+        CaptureStatus.Text = Loc.T("Not capturing");
         if (hideOverlay && _overlay.IsVisible) _overlay.Hide();
     }
 
@@ -712,11 +738,11 @@ public partial class ControlWindow : Window
             ShowText = TextCheck.IsChecked == true,
             KeptInstruments = stale ? new HashSet<int>() : new HashSet<int>(_run.Kept),
             Hint = stale || !_settings.Hints ? null : _hint,
-            Status = stale ? "Tartarus: the window's size changed, a new scan is needed" : _status,
+            Status = stale ? Loc.T("Tartarus: the window's size changed, a new scan is needed") : _status,
             // The game keeps the picture it drew before its window was resized by the edges: its layout is only
             // guessed (2026-10-30, a player's report: nothing read).
             Warning = _scan?.Notes?.Any(n => n.StartsWith(Vision.GamePicture.Note, StringComparison.Ordinal)) == true
-                ? "The game's picture doesn't fill its window: set the window size in the game's settings, or press Alt+Enter twice"
+                ? Loc.T("The game's picture doesn't fill its window: set the window size in the game's settings, or press Alt+Enter twice")
                 : null,
             LanguageAsk = _textUnread && _scan is { Ok: true } ? LanguageAsk : null,
             EyeHint = !stale && _settings.Hints && _eyeHint,
@@ -731,7 +757,7 @@ public partial class ControlWindow : Window
     {
         if (_capture == null)
         {
-            if (manual) ScanStatus.Text = "Not capturing a window";
+            if (manual) ScanStatus.Text = Loc.T("Not capturing a window");
             return false;
         }
         if (_scans.Busy || (_editMode && !manual)) return false;
@@ -756,7 +782,7 @@ public partial class ControlWindow : Window
         if (capture != _capture) return false;
         if (frame == null)
         {
-            if (manual) ScanStatus.Text = "No frames yet (is the window minimized?)";
+            if (manual) ScanStatus.Text = Loc.T("No frames yet (is the window minimized?)");
             return false;
         }
         ScanResult r;
@@ -834,13 +860,19 @@ public partial class ControlWindow : Window
         _sandbox = _scannedSandbox.Clone();
         _selected = -1;
         _savedSinceScan = false;
-        _status = r.Ok ? null : manual || _editMode ? $"Tartarus: no Sandbox found ({r.TotalMs:0} ms)" : null;
+        _status = r.Ok ? null : manual || _editMode
+            ? Loc.F("Tartarus: no Sandbox found ({0} ms)", r.TotalMs.ToString("0", CultureInfo.InvariantCulture)) : null;
         RefreshOverlay();
         RefreshLabelsUi();
-        ScanStatus.Text = (r.Ok ? $"Sandbox · {r.TotalMs:0} ms" : $"No Sandbox: {r.Reason} · {r.TotalMs:0} ms")
-            + (r.Timings.TryGetValue("ocr", out var ocrMs) ? $" (OCR {ocrMs:0}, cells {r.Timings.GetValueOrDefault("cells"):0})" : "")
-            + (r.Timings.ContainsKey("presence") ? $" · presence {r.Loc?.Score:0.00}" : "")
-            + $" · {frame.Width}×{frame.Height} · {r.Source}";
+        ScanStatus.Text = (r.Ok
+                ? Loc.F("Sandbox · {0} ms", r.TotalMs.ToString("0", CultureInfo.InvariantCulture))
+                : Loc.F("No Sandbox: {0} · {1} ms", r.Reason, r.TotalMs.ToString("0", CultureInfo.InvariantCulture)))
+            + (r.Timings.TryGetValue("ocr", out var ocrMs)
+                ? Loc.F(" (OCR {0}, cells {1})", ocrMs.ToString("0", CultureInfo.InvariantCulture),
+                    r.Timings.GetValueOrDefault("cells").ToString("0", CultureInfo.InvariantCulture))
+                : "")
+            + (r.Timings.ContainsKey("presence") ? Loc.F(" · presence {0}", (r.Loc?.Score ?? 0).ToString("0.00", CultureInfo.InvariantCulture)) : "")
+            + Loc.F(" · {0}×{1} · {2}", frame.Width, frame.Height, r.Source);
         string description = SandboxText.Describe(r);
         // What was read, without the scan's timing and presence score (they differ every scan).
         string reading = r.Ok ? SandboxText.Describe(_scannedSandbox) : description;
@@ -890,7 +922,10 @@ public partial class ControlWindow : Window
     private void ShowHintLevel()
     {
         var level = _hintLevels[Math.Clamp((int)HintSlider.Value, 0, _hintLevels.Count - 1)];
-        HintLevelText.Text = $"~{level.Milliseconds:0.#} ms per move · ≈{level.Chromatic:0.0} Chromatic per run ({level.Playouts:N0} playouts per move)";
+        HintLevelText.Text = Loc.F("~{0} ms per move · ≈{1} Chromatic per run ({2} playouts per move)",
+            level.Milliseconds.ToString("0.#", CultureInfo.InvariantCulture),
+            level.Chromatic.ToString("0.0", CultureInfo.InvariantCulture),
+            level.Playouts.ToString("N0", CultureInfo.InvariantCulture));
     }
 
     private void HintSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1003,13 +1038,14 @@ public partial class ControlWindow : Window
     }
 
     private void ShowLogStatus() => LogStatus.Text =
-        (_gameLogPath ?? "not found: screen recognition only") + (_settings.GameLogPath != null ? " (chosen by hand)" : " (found automatically)");
+        (_gameLogPath ?? Loc.T("not found: screen recognition only"))
+        + (_settings.GameLogPath != null ? Loc.T(" (chosen by hand)") : Loc.T(" (found automatically)"));
 
     private void PickLogButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "UE_game.log: game folder\\UE_game\\TorchLight\\Saved\\Logs",
+            Title = Loc.T("UE_game.log: game folder\\UE_game\\TorchLight\\Saved\\Logs"),
             Filter = "Game log (UE_game.log)|UE_game.log|Logs (*.log)|*.log",
             InitialDirectory = _gameLogPath != null ? Path.GetDirectoryName(_gameLogPath) : null,
         };
@@ -1153,7 +1189,7 @@ public partial class ControlWindow : Window
                 // A run the log saw from its start: its Chromatic count, or the panel's when higher (a sound can go missing).
                 if (live is { FromStart: true }) _hintSandbox.Chromatic = Math.Max(_hintSandbox.Chromatic, live.ChromaticAtLeast);
                 // The Sandbox viewed from a pick is read now: back to the pick is the hint.
-                ShowEye(viewing, "the Sandbox is read, back to the pick (the eye button)");
+                ShowEye(viewing, Loc.T("the Sandbox is read, back to the pick (the eye button)"));
                 if (viewing)
                 {
                     _hints.Clear();
@@ -1649,7 +1685,7 @@ public partial class ControlWindow : Window
         var cell = sandbox.Cells[idx];
         int n = idx + 1;
         var menu = new ContextMenu();
-        menu.Items.Add(new MenuItem { Header = $"Cell {n}: {SandboxText.CellShort(cell)}", IsEnabled = false });
+        menu.Items.Add(new MenuItem { Header = Loc.F("Cell {0}: {1}", n, SandboxText.CellShort(cell)), IsEnabled = false });
         menu.Items.Add(new Separator());
 
         if (idx > 0)
@@ -1660,7 +1696,7 @@ public partial class ControlWindow : Window
             // An Inmate: its Code, then its rarity (Normal .. Ultimate: Chromatic leaves the Sandbox).
             foreach (var code in Codes.All)
             {
-                var sub = new MenuItem { Header = Codes.Name(code), IsChecked = cell.Kind == CellKind.Inmate && cell.Code == code };
+                var sub = new MenuItem { Header = Loc.T(Codes.Name(code)), IsChecked = cell.Kind == CellKind.Inmate && cell.Code == code };
                 for (var rarity = Rarity.Normal; rarity <= Rarity.Ultimate; rarity++)
                 {
                     var r = rarity;
@@ -1681,7 +1717,7 @@ public partial class ControlWindow : Window
             menu.Items.Add(Item("Tusk (Iron Tongs of Lust: Mammoth)", cell.Tusk, () => cell.Tusk = !cell.Tusk));
             menu.Items.Add(Item("Prey (Hunt, Blood-Stained Trap)", cell.Prey, () => cell.Prey = !cell.Prey));
             menu.Items.Add(Item("Rat Nest (Squirming Iron Box)", cell.Nest, () => cell.Nest = !cell.Nest));
-            var visibleMenu = new MenuItem { Header = "Visible rarity (Unopened)", IsChecked = cell.VisibleRarity != null };
+            var visibleMenu = new MenuItem { Header = Loc.T("Visible rarity (Unopened)"), IsChecked = cell.VisibleRarity != null };
             visibleMenu.Items.Add(Item("none", cell.VisibleRarity == null, () => cell.VisibleRarity = null));
             for (var rarity = Rarity.Normal; rarity <= Rarity.Ultimate; rarity++)
             {
@@ -1709,7 +1745,7 @@ public partial class ControlWindow : Window
             sandbox.Warden = n;
             sandbox.SandboxEdited = true;
         }, cellEdit: false));
-        menu.Items.Add(Item(sandbox.Destinations.Contains(n) ? $"Remove from Destinations (D{sandbox.Destinations.IndexOf(n) + 1})" : $"Add to Destinations (D{sandbox.Destinations.Count + 1})", sandbox.Destinations.Contains(n), () =>
+        menu.Items.Add(Item(sandbox.Destinations.Contains(n) ? Loc.F("Remove from Destinations (D{0})", sandbox.Destinations.IndexOf(n) + 1) : Loc.F("Add to Destinations (D{0})", sandbox.Destinations.Count + 1), sandbox.Destinations.Contains(n), () =>
         {
             if (!sandbox.Destinations.Remove(n)) sandbox.Destinations.Add(n);
             sandbox.Phase = sandbox.Destinations.Count > 0 ? Phases.Destination : Phases.Decision;
@@ -1724,7 +1760,7 @@ public partial class ControlWindow : Window
 
         MenuItem Item(string header, bool isChecked, Action apply, bool cellEdit = true)
         {
-            var mi = new MenuItem { Header = header, IsChecked = isChecked };
+            var mi = new MenuItem { Header = Loc.T(header), IsChecked = isChecked };
             mi.Click += (_, _) =>
             {
                 apply();
