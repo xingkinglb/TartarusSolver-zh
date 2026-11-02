@@ -17,7 +17,7 @@ public sealed class OverlayWindow : Window
 
     public OverlayWindow()
     {
-        Title = "Tartarus overlay";
+        Title = Loc.T("Tartarus overlay");
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;

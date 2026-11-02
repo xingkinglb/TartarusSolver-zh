@@ -71,6 +71,11 @@ public sealed class AppSettings
     private const int CurrentVersion = 3;
     /// <summary>Where bug reports go (a Sentry DSN); empty: the app's own (BugReports.DefaultDsn).</summary>
     public string? ReportDsn { get; set; }
+    /// <summary>
+    /// The language the app's own window and overlay are drawn in: "auto" (this Windows' language: Chinese for any
+    /// zh-*), "en", "zhCN". Not the game's language (<see cref="GameLanguage"/>): that one is what the game's text is read in.
+    /// </summary>
+    public string UiLanguage { get; set; } = "auto";
     /// <summary>A random id of this install: tells one tester's reports from another's, and nothing else about them.</summary>
     public string InstallId { get; set; } = Guid.NewGuid().ToString("N")[..12];
     /// <summary>Ask GitHub for a new version (the player's window; never with --debug).</summary>
