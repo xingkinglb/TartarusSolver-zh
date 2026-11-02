@@ -19,8 +19,9 @@ public partial class GameLanguageWindow : Window
     {
         InitializeComponent();
         Message.Text = first
-            ? "The language found in the game's settings is marked."
-            : $"The game's text can't be read as {OcrPacks.LanguageName(current)}: move hints may be missing or wrong.";
+            ? Loc.T("The language found in the game's settings is marked.")
+            : Loc.F("The game's text can't be read as {0}: move hints may be missing or wrong.",
+                OcrPacks.LanguageName(current));
         foreach (var code in OcrPacks.GameLanguages)
         {
             string name = OcrPacks.LanguageName(code), native = OcrPacks.NativeName(code);
@@ -30,6 +31,8 @@ public partial class GameLanguageWindow : Window
             LanguageList.Items.Add(item);
             if (first && name == OcrPacks.LanguageName(current)) LanguageList.SelectedItem = item;
         }
+        if (Loc.Chinese) FontFamily = Loc.Font;
+        LocTree.Apply(this);
     }
 
     private void LanguageList_SelectionChanged(object sender, SelectionChangedEventArgs e) => UseButton.IsEnabled = LanguageList.SelectedItem != null;
