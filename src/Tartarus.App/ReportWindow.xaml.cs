@@ -19,8 +19,10 @@ public partial class ReportWindow : Window
         {
             // The app's own error: wherever it happened, it's worth telling.
             OnlyTartarus.Visibility = Visibility.Collapsed;
-            Prompt.Text = "The app caught an error. What were you doing just before it?";
+            Prompt.Text = Loc.T("The app caught an error. What were you doing just before it?");
         }
+        if (Loc.Chinese) FontFamily = Loc.Font;
+        LocTree.Apply(this);
         Loaded += (_, _) =>
         {
             Activate();
@@ -31,7 +33,7 @@ public partial class ReportWindow : Window
     private async void SendButton_Click(object sender, RoutedEventArgs e)
     {
         SendButton.IsEnabled = CancelButton.IsEnabled = CommentBox.IsEnabled = false;
-        StatusText.Text = "Sending…";
+        StatusText.Text = Loc.T("Sending…");
         StatusText.Visibility = Visibility.Visible;
         string comment = CommentBox.Text;
         Result = await Task.Run(() => BugReports.SendAsync(_report, comment));
