@@ -1,14 +1,14 @@
-> ### 简体中文版
+> ### 官方版已内置简体中文 —— 建议直接用官方版
 >
-> **⬇ [下载最新版](https://github.com/xingkinglb/TartarusSolver-zh/releases/latest)** —— 自带 .NET 运行时，解压后双击 `TartarusSolver.exe` 就能用，不用装任何东西。
+> 作者从 **0.7.43** 起把界面做成了全语言支持（含简体中文），中文文案来自本仓库，作者在
+> [README 的鸣谢](https://github.com/glcoder/TartarusSolver#credits) 与 [CHANGELOG](https://github.com/glcoder/TartarusSolver/blob/main/CHANGELOG.md) 里注明了出处。
 >
-> 本仓库是 [glcoder/TartarusSolver](https://github.com/glcoder/TartarusSolver) 的汉化分支，基于上游 **0.7.41**。
-> 只改界面显示，识别、求解、规则与原版完全一致；诊断日志保留英文，便于向原作者反馈。
-> 可能落后上游若干版本，下载前请对照 [上游 releases](https://github.com/glcoder/TartarusSolver/releases) 看清版本号。
+> **下载官方版 →** https://github.com/glcoder/TartarusSolver/releases/latest
 >
-> **怎么用** → [使用手册](使用手册.md)（每个按钮、每一格标记都有解释）　**汉化原理与跟版** → [中文说明](中文说明.md)
+> 本仓库保留作过渡：还在用 0.7.43 之前版本的话，或者只想要一个自带运行时、解压双击就能跑的包，这里仍然可用。
+> 中文译法有想改的，建议直接给上游提 issue / PR，文件是 `src/Tartarus.App/Localization/Strings.zh-Hans.resx`（作者欢迎校正）。
 >
-> 系统要求：Windows 10 1903 或更高、64 位；游戏需用**窗口化**或**无边框窗口**（独占全屏下叠加层画不出来）。
+> 逐项功能说明见 **[使用手册](使用手册.md)** · 汉化原理与跟版方法见 **[中文说明](中文说明.md)**
 >
 > ![设置窗口](screenshot.png)
 
